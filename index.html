@@ -201,7 +201,8 @@ input[type="date"]{padding:1px 3px;border-radius:3px;border:1px solid #ccc;font-
 const CATS = [
   {col:'0',     label:'0',      bg:'#90EE90', tx:'#333'},
   {col:'1-5',   label:'1-5',    bg:'#00B050', tx:'#fff'},
-  {col:'6-30',  label:'6-30',   bg:'#00B0F0', tx:'#fff'},
+  {col:'6-15',  label:'6-15',   bg:'#0070C0', tx:'#fff'},  // nueva categoría
+  {col:'16-30', label:'16-30',  bg:'#00B0F0', tx:'#fff'},  // antes '6-30' en Excel → ahora '16-30'
   {col:'31-60', label:'31-60',  bg:'#FFFF00', tx:'#000'},
   {col:'61-100',label:'61-100', bg:'#FFC000', tx:'#fff'},
   {col:'.+100', label:'.+100',  bg:'#FF0000', tx:'#fff'},
@@ -682,6 +683,17 @@ const ESTRUCTURA = {
     'VICTORIA':      ['VIC']
   }
 };
+
+function debugDatos() {
+  const años = [...new Set(rawData.map(d=>d.AÑO))].sort();
+  const ultimoAño = años[años.length-1];
+  const mesesDelAño = [...new Set(rawData.filter(d=>d.AÑO==ultimoAño).map(d=>d.MES))];
+  console.log('Último año:', ultimoAño);
+  console.log('Meses disponibles:', mesesDelAño);
+  console.log('Total registros:', rawData.length);
+  console.log('Registros mayo:', rawData.filter(d=>String(d.MES).toUpperCase().includes('MAY')).length);
+  console.log('Muestra registro:', rawData[rawData.length-1]);
+}
 
 function buildTabla2(f, anioBase) {
   const wrap = $('tbl2-wrap');
