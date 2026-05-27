@@ -59,7 +59,7 @@ input[type="date"]{padding:1px 3px;border-radius:3px;border:1px solid #ccc;font-
 .chart-title{font-size:13px;font-weight:700;color:#333;margin-bottom:6px;padding-left:2px;display:flex;align-items:center;gap:8px}
 .chart-title .ct-dash{font-size:11px;font-weight:600;background:#333F48;color:#fff;padding:2px 8px;border-radius:20px}
 .chart-title .ct-zone{font-size:11px;font-weight:600;background:#E4002B;color:#fff;padding:2px 8px;border-radius:20px}
-.chart-title .ct-info{font-size:11px;color:#888;font-weight:500}
+.chart-title .ct-info{font-size:11px;color:#fff;font-weight:500;background:#4A4847;padding:2px 8px;border-radius:20px}
 /* Gráfica */
 .chart-container{height:450px;position:relative;margin-top:10px}
 /* Upload */
@@ -68,8 +68,8 @@ input[type="date"]{padding:1px 3px;border-radius:3px;border:1px solid #ccc;font-
 /* Tabla */
 .tabla-wrap{margin-top:20px;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1)}
 .tabla-toolbar{display:flex;align-items:center;justify-content:space-between;background:#333F48;color:#fff;padding:8px 14px;font-size:11px;font-weight:700}
-.btn-dl{background:#00882B;color:#fff;border:none;padding:4px 14px;border-radius:4px;cursor:pointer;font-size:10px;font-weight:700}
-.btn-dl:hover{background:#006820}
+.btn-dl{background:#227447;color:#fff;border:none;padding:4px 14px;border-radius:4px;cursor:pointer;font-size:10px;font-weight:700}
+.btn-dl:hover{background:#1a5a37}
 .tabla-scroll{overflow-x:auto;max-height:320px;overflow-y:auto}
 #tbl{width:100%;border-collapse:collapse;font-size:11px;font-family:'Segoe UI',sans-serif}
 #tbl thead th{background:#333F48;color:#fff;padding:6px 10px;text-align:center;white-space:nowrap;font-size:10px;position:sticky;top:0;z-index:2;border-right:1px solid #4a5a68}
@@ -809,25 +809,18 @@ function buildTabla2(f, anioBase) {
 
 function descargarCSV2() {
   const tbl = $('tbl2'); if(!tbl) return;
-  const NL = String.fromCharCode(10);
-  const rows = [...tbl.querySelectorAll('tr')].map(r =>
-    [...r.querySelectorAll('th,td')].map(c => '"'+c.textContent.trim().replace(/"/g,'""')+'"').join(',')
-  );
-  const csv = '﻿' + rows.join(NL);
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
-  a.download = 'Promedio_Desglose.csv';
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  const ws = XLSX.utils.table_to_sheet(tbl);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Desglose');
+  XLSX.writeFile(wb, 'Promedio_Desglose.xlsx');
 }
 
 function descargarCSV() {
-  const tbl=$('tbl');if(!tbl) return;
-  const NL2=String.fromCharCode(10);
-  const csv='﻿'+[...tbl.querySelectorAll('tr')].map(r=>[...r.querySelectorAll('th,td')].map(c=>'"'+c.textContent.trim().replace(/"/g,'""')+'"').join(',')).join(NL2);
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
-  a.download=($('tblTitulo').textContent||'datos').replace(/[^a-z0-9]/gi,'_')+'.csv';
-  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  const tbl=$('tbl'); if(!tbl) return;
+  const ws=XLSX.utils.table_to_sheet(tbl);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Datos');
+  XLSX.writeFile(wb,($('tblTitulo').textContent||'datos').replace(/[^a-z0-9]/gi,'_')+'.xlsx');
 }
 
 // ── Navegación ───────────────────────────────────────────────────────
