@@ -758,10 +758,14 @@ function buildTabla2(f, anioBase) {
   let rows = '';
 
   CATS.forEach(cat => {
-    // Fila categoría
+    // Fila categoría — promedio total de la categoría por mes (todos los registros)
     const bgLight = hexRgba(cat.bg, 0.20);
     rows += '<tr><td class="t2-cat" style="background:'+cat.bg+';color:'+cat.tx+';">'+cat.label+'</td>' +
-      cols.map(() => '<td style="background:'+bgLight+';"></td>').join('') + '</tr>';
+      cols.map(c => {
+        const regs = idx[c.mes] || [];
+        const v = calcProm(regs, cat);
+        return '<td style="background:'+bgLight+';color:'+cat.tx+';font-weight:800;text-shadow:0 0 2px rgba(0,0,0,.3);">'+(v!==null ? v.toFixed(1) : '')+'</td>';
+      }).join('') + '</tr>';
 
     Object.entries(ESTRUCTURA).forEach(([zona, divisiones]) => {
       // Pre-calcular valores de cada división para que zona = suma de divisiones
