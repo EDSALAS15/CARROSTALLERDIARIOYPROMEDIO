@@ -764,7 +764,7 @@ function buildTabla2(f, anioBase) {
       cols.map(c => {
         const regs = idx[c.mes] || [];
         const v = calcProm(regs, cat);
-        return '<td style="background:'+bgLight+';color:'+cat.tx+';font-weight:800;text-shadow:0 0 2px rgba(0,0,0,.3);">'+(v!==null ? v.toFixed(1) : '')+'</td>';
+        return '<td style="background:'+bgLight+';color:#000000;font-weight:800;">'+(v!==null ? v.toFixed(1) : '')+'</td>';
       }).join('') + '</tr>';
 
     Object.entries(ESTRUCTURA).forEach(([zona, divisiones]) => {
