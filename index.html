@@ -499,7 +499,7 @@ function render() {
       if(semSel.size>0&&!semSel.has(String(d.SEMANA))) return;
       if(!ok(d)) return;
       let key;
-      if(isD1){ const dt=new Date(d.FECHA); if(isPrev) dt.setFullYear(dt.getFullYear()+1); key=dt.toLocaleDateString(); }
+      if(isD1){ const dt=new Date(d.FECHA); if(isPrev) dt.setFullYear(dt.getFullYear()+1); const dd=String(dt.getDate()).padStart(2,'0'),mm=String(dt.getMonth()+1).padStart(2,'0'),yy=dt.getFullYear(); key=dd+'/'+mm+'/'+yy; }
       else key=d[groupMode];
       if(!key) return;
       if(!mapa[key]){ mapa[key]={total:0,metaSum:0,metaCount:0,diasUnicos:new Set()}; CATS.forEach(c=>mapa[key][c.label]=0); }
