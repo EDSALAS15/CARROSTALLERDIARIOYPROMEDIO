@@ -813,7 +813,12 @@ function buildTabla2(f, anioBase) {
 
 function descargarCSV2() {
   const tbl = $('tbl2'); if(!tbl) return;
-  const ws = XLSX.utils.table_to_sheet(tbl);
+  const ws = XLSX.utils.table_to_sheet(tbl, {raw:false, dateNF:'DD/MM/YYYY'});
+  Object.keys(ws).filter(k=>k[0]!=='!').forEach(k=>{
+    if(ws[k].v && /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(String(ws[k].v))) {
+      ws[k].t='s'; ws[k].v=String(ws[k].v); delete ws[k].z;
+    }
+  });
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Desglose');
   XLSX.writeFile(wb, 'Promedio_Desglose.xlsx');
@@ -821,7 +826,14 @@ function descargarCSV2() {
 
 function descargarCSV() {
   const tbl=$('tbl'); if(!tbl) return;
-  const ws=XLSX.utils.table_to_sheet(tbl);
+  // raw:false fuerza todas las celdas como texto, evitando que Excel reinterprete fechas DD/MM/YYYY
+  const ws=XLSX.utils.table_to_sheet(tbl, {raw:false, dateNF:'DD/MM/YYYY'});
+  // Forzar formato texto en todas las celdas que parezcan fechas
+  Object.keys(ws).filter(k=>k[0]!=='!').forEach(k=>{
+    if(ws[k].v && /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(String(ws[k].v))) {
+      ws[k].t='s'; ws[k].v=String(ws[k].v); delete ws[k].z;
+    }
+  });
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'Datos');
   XLSX.writeFile(wb,($('tblTitulo').textContent||'datos').replace(/[^a-z0-9]/gi,'_')+'.xlsx');
