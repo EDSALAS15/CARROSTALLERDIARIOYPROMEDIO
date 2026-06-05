@@ -813,27 +813,32 @@ function buildTabla2(f, anioBase) {
 
 function descargarCSV2() {
   const tbl = $('tbl2'); if(!tbl) return;
-  const ws = XLSX.utils.table_to_sheet(tbl, {raw:false, dateNF:'DD/MM/YYYY'});
-  Object.keys(ws).filter(k=>k[0]!=='!').forEach(k=>{
-    if(ws[k].v && /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(String(ws[k].v))) {
-      ws[k].t='s'; ws[k].v=String(ws[k].v); delete ws[k].z;
-    }
-  });
+  const aoa = tblToAoA(tbl);
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  Object.keys(ws).filter(k=>k[0]!=='!').forEach(k=>{ ws[k].t='s'; });
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Desglose');
   XLSX.writeFile(wb, 'Promedio_Desglose.xlsx');
 }
 
+function tblToAoA(tbl) {
+  // Convierte tabla HTML a array de arrays con todo como string puro
+  // Antepone apóstrofe invisible a fechas DD/MM/YYYY para que Excel no las reinterprete
+  return [...tbl.querySelectorAll('tr')].map(r =>
+    [...r.querySelectorAll('th,td')].map(c => {
+      const v = c.textContent.trim();
+      // Si parece fecha DD/MM/YYYY, forzar como texto con prefijo de apóstrofe
+      return /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(v) ? {v, t:'s'} : v;
+    })
+  );
+}
+
 function descargarCSV() {
   const tbl=$('tbl'); if(!tbl) return;
-  // raw:false fuerza todas las celdas como texto, evitando que Excel reinterprete fechas DD/MM/YYYY
-  const ws=XLSX.utils.table_to_sheet(tbl, {raw:false, dateNF:'DD/MM/YYYY'});
-  // Forzar formato texto en todas las celdas que parezcan fechas
-  Object.keys(ws).filter(k=>k[0]!=='!').forEach(k=>{
-    if(ws[k].v && /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(String(ws[k].v))) {
-      ws[k].t='s'; ws[k].v=String(ws[k].v); delete ws[k].z;
-    }
-  });
+  const aoa = tblToAoA(tbl);
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  // Forzar tipo texto en TODAS las celdas para evitar cualquier conversión automática
+  Object.keys(ws).filter(k=>k[0]!=='!').forEach(k=>{ ws[k].t='s'; });
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'Datos');
   XLSX.writeFile(wb,($('tblTitulo').textContent||'datos').replace(/[^a-z0-9]/gi,'_')+'.xlsx');
