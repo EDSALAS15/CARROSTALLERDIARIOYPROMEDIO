@@ -277,6 +277,11 @@ function procesarExcel(buf) {
   rawData = data.map(r => {
     const n={};
     for(const k in r) n[k.trim().toUpperCase()]=r[k];
+    // Normalizar valores de texto clave a MAYÚSCULAS para comparaciones consistentes
+    if(n.MES)      n.MES      = String(n.MES).toUpperCase().trim();
+    if(n.ZONA)     n.ZONA     = String(n.ZONA).toUpperCase().trim();
+    if(n.DIVISION) n.DIVISION = String(n.DIVISION).toUpperCase().trim();
+    if(n.TIPO)     n.TIPO     = String(n.TIPO).toUpperCase().trim();
     return n;
   });
   $('mainUI').style.display   = 'block';
