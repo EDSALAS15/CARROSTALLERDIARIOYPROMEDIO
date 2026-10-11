@@ -107,7 +107,8 @@ input[type="date"]{padding:1px 3px;border-radius:3px;border:1px solid #ccc;font-
       </div>
       <div class="nav-children open" id="children-group-dash">
         <button id="t1" class="tab-btn active" onclick="changeDash(1)">Cantidad Diaria</button>
-        <button id="t2" class="tab-btn" onclick="changeDash(2)">Promedio</button>
+        <button id="t2" class="tab-btn" onclick="changeDash(2)">Promedio Taller</button>
+        <button id="t3" class="tab-btn" onclick="changeDash(3)">Promedio Dirección</button>
       </div>
     </div>
   </nav>
@@ -198,17 +199,34 @@ input[type="date"]{padding:1px 3px;border-radius:3px;border:1px solid #ccc;font-
 
 // ── Constantes ───────────────────────────────────────────────────────
 // CATS: col = nombre exacto de columna en el Excel, label = nombre visible en gráfica/tabla
-const CATS = [
+// Categorías de TALLER (Cantidad Diaria y Promedio Taller)
+const CATS_TALLER = [
   {col:'0',     label:'0',      bg:'#90EE90', tx:'#333'},
   {col:'1-5',   label:'1-5',    bg:'#00B050', tx:'#fff'},
-  {col:'6-15',  label:'6-15',   bg:'#0070C0', tx:'#fff'},  // nueva categoría
-  {col:'16-30', label:'16-30',  bg:'#00B0F0', tx:'#fff'},  // antes '6-30' en Excel → ahora '16-30'
+  {col:'6-15',  label:'6-15',   bg:'#0070C0', tx:'#fff'},
+  {col:'16-30', label:'16-30',  bg:'#00B0F0', tx:'#fff'},
   {col:'31-60', label:'31-60',  bg:'#FFFF00', tx:'#000'},
   {col:'61-100',label:'61-100', bg:'#FFC000', tx:'#fff'},
   {col:'.+100', label:'.+100',  bg:'#FF0000', tx:'#fff'},
 ];
-// COLORS indexado por label para lookups rápidos
-const COLORS = Object.fromEntries(CATS.map(c=>([c.label,{bg:c.bg,tx:c.tx}])));
+// Categorías de DIRECCION (Promedio Dirección)
+const CATS_DIRECCION = [
+  {col:'0-7',  label:'0-7',   bg:'#00B050', tx:'#fff'},
+  {col:'8-15', label:'8-15',  bg:'#FFFF00', tx:'#000'},
+  {col:'16-30',label:'16-30', bg:'#0070C0', tx:'#fff'},
+  {col:'.+30', label:'.+30',  bg:'#FF0000', tx:'#fff'},
+];
+// CATS y COLORS se actualizan según la pestaña activa (ver aplicarContexto)
+let CATS   = CATS_TALLER;
+let COLORS = Object.fromEntries(CATS.map(c=>([c.label,{bg:c.bg,tx:c.tx}])));
+// Datos activos según pestaña: TALLER o DIRECCION
+let rawDataActivo = [];
+// Aplica el contexto (categorías + datos) según el dashboard actual
+function aplicarContexto() {
+  if(currentDash===3) { CATS = CATS_DIRECCION; rawDataActivo = rawDataDireccion; }
+  else                { CATS = CATS_TALLER;    rawDataActivo = rawDataTaller; }
+  COLORS = Object.fromEntries(CATS.map(c=>([c.label,{bg:c.bg,tx:c.tx}])));
+}
 // Función para leer valor de una categoría del registro del Excel
 // Intenta el col exacto, luego busca por coincidencia parcial si no encuentra
 function getVal(d, cat) {
@@ -232,16 +250,18 @@ const FIELDS = ['AÑO','MES','SEMANA','ZONA','DIVISION','TIPO'];
 const EXCEL_URL = 'historialdiariocarrostaller.xlsx';
 
 // ── Estado global ────────────────────────────────────────────────────
-let rawData = [], myChart = null, currentDash = 1, groupMode = 'MES', renderTimer = null;
+let rawDataTaller = [], rawDataDireccion = [];
+let myChart = null, currentDash = 1, groupMode = 'MES', renderTimer = null;
 let hiddenCats = new Set(); // categorías ocultas en leyenda (persiste entre renders)
 let lastRenderState = null; // guarda el estado del último render para recalcular KPIs
 let filtersD1 = {AÑO:[],MES:[],SEMANA:[],ZONA:[],DIVISION:[],TIPO:[],sd:'',ed:''};
 let filtersD2 = {AÑO:[],MES:[],SEMANA:[],ZONA:[],DIVISION:[],TIPO:[],sd:'',ed:''};
+let filtersD3 = {AÑO:[],MES:[],SEMANA:[],ZONA:[],DIVISION:[],TIPO:[],sd:'',ed:''};
 
 // ── Helpers ──────────────────────────────────────────────────────────
 const $  = id => document.getElementById(id);
 const fmtDate = s => { if(!s) return ''; const [y,m,d]=s.split('-'); return `${d}/${m}/${y}`; };
-const getF = () => currentDash===1 ? filtersD1 : filtersD2;
+const getF = () => currentDash===1 ? filtersD1 : currentDash===2 ? filtersD2 : filtersD3;
 
 function makeDelta(pct) {
   const arrow = pct>0?'▲':pct<0?'▼':'●';
@@ -271,19 +291,27 @@ document.addEventListener('click', e => {
 });
 
 // ── Carga Excel ──────────────────────────────────────────────────────
-function procesarExcel(buf) {
-  const wb   = XLSX.read(buf, {type:'array', cellDates:true});
-  const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-  rawData = data.map(r => {
+function normalizarHoja(data) {
+  return data.map(r => {
     const n={};
     for(const k in r) n[k.trim().toUpperCase()]=r[k];
-    // Normalizar valores de texto clave a MAYÚSCULAS para comparaciones consistentes
     if(n.MES)      n.MES      = String(n.MES).toUpperCase().trim();
     if(n.ZONA)     n.ZONA     = String(n.ZONA).toUpperCase().trim();
     if(n.DIVISION) n.DIVISION = String(n.DIVISION).toUpperCase().trim();
     if(n.TIPO)     n.TIPO     = String(n.TIPO).toUpperCase().trim();
     return n;
   });
+}
+
+function procesarExcel(buf) {
+  const wb = XLSX.read(buf, {type:'array', cellDates:true});
+  // Buscar hojas TALLER y DIRECCION (insensible a mayúsculas/espacios)
+  const findSheet = name => wb.SheetNames.find(s => s.toUpperCase().trim()===name);
+  const hojaTaller = findSheet('TALLER') || wb.SheetNames[0];
+  const hojaDir    = findSheet('DIRECCION');
+  rawDataTaller    = normalizarHoja(XLSX.utils.sheet_to_json(wb.Sheets[hojaTaller]));
+  rawDataDireccion = hojaDir ? normalizarHoja(XLSX.utils.sheet_to_json(wb.Sheets[hojaDir])) : [];
+  aplicarContexto();
   $('mainUI').style.display   = 'block';
   $('uploadArea').style.display = 'none';
   initDates();
@@ -317,19 +345,19 @@ document.addEventListener('change', e => {
 
 // ── Inicialización ───────────────────────────────────────────────────
 function initDates() {
-  const dates = rawData.map(d => new Date(d.FECHA)).filter(d => !isNaN(d)).sort((a,b)=>a-b);
+  const dates = rawDataActivo.map(d => new Date(d.FECHA)).filter(d => !isNaN(d)).sort((a,b)=>a-b);
   if(!dates.length) return;
   const last  = dates[dates.length-1];
   const first = new Date(last); first.setDate(first.getDate()-30);
   const fmt = d => d.toISOString().split('T')[0];
-  filtersD1.sd=filtersD2.sd=fmt(first);
-  filtersD1.ed=filtersD2.ed=fmt(last);
+  filtersD1.sd=filtersD2.sd=filtersD3.sd=fmt(first);
+  filtersD1.ed=filtersD2.ed=filtersD3.ed=fmt(last);
   updateUIFilters();
 }
 
 function buildFilters() {
   FIELDS.forEach(field => {
-    let opts=[...new Set(rawData.map(d=>d[field]))].filter(v=>v);
+    let opts=[...new Set(rawDataActivo.map(d=>d[field]))].filter(v=>v);
     if(field==='MES')             opts.sort((a,b)=>MESES.indexOf(a)-MESES.indexOf(b));
     else if(field==='SEMANA'||field==='AÑO') opts.sort((a,b)=>Number(a)-Number(b));
     $('opts'+field).innerHTML = opts.map(o =>
@@ -363,7 +391,7 @@ function handleFilterChange(field) {
       const años=f.AÑO.map(Number).sort((a,b)=>a-b);
       f.sd=`${años[0]}-01-01`; f.ed=`${años[años.length-1]}-12-31`;
     } else {
-      const dates=rawData.map(d=>new Date(d.FECHA)).filter(d=>!isNaN(d)).sort((a,b)=>a-b);
+      const dates=rawDataActivo.map(d=>new Date(d.FECHA)).filter(d=>!isNaN(d)).sort((a,b)=>a-b);
       if(dates.length){ const l=dates[dates.length-1],fi=new Date(l); fi.setDate(fi.getDate()-30); f.sd=fi.toISOString().split('T')[0]; f.ed=l.toISOString().split('T')[0]; }
     }
     $('dStart').value=f.sd; $('dEnd').value=f.ed;
@@ -430,7 +458,7 @@ function updateKPIs(actualMap, prevMap, labels, isD1, f, anioBase) {
 function updateChartTitle(isD1, f, anioBase, gMode) {
   const zona=f.ZONA.length?f.ZONA.join(', '):'Todas las zonas';
   const div =f.DIVISION.length?' · Div: '+f.DIVISION.join(', '):'';
-  $('ctDash').textContent=isD1?'Cantidad Diaria':'Promedio';
+  $('ctDash').textContent = currentDash===1?'Cantidad Diaria':currentDash===2?'Promedio Taller':'Promedio Dirección';
   $('ctZone').textContent=zona+div;
   $('ctInfo').textContent=isD1&&f.sd&&f.ed?`${f.sd} → ${f.ed}`:`Agrupado por ${gMode}`;
 }
@@ -448,7 +476,7 @@ function render() {
   const ok=d=>(f.ZONA.length===0||f.ZONA.includes(String(d.ZONA)))&&(f.DIVISION.length===0||f.DIVISION.includes(String(d.DIVISION)))&&(f.TIPO.length===0||f.TIPO.includes(String(d.TIPO)));
 
   // Año base
-  const allYears=[...new Set(rawData.map(d=>Number(d.AÑO)).filter(y=>y>1900))].sort((a,b)=>a-b);
+  const allYears=[...new Set(rawDataActivo.map(d=>Number(d.AÑO)).filter(y=>y>1900))].sort((a,b)=>a-b);
   const anioBase=f.AÑO.length?Math.max(...f.AÑO.map(Number)):allYears[allYears.length-1]||new Date().getFullYear();
   const anioAnt=anioBase-1;
 
@@ -458,7 +486,7 @@ function render() {
   // Función: promedio anual (modo AÑO)
   function calcAnio(anio) {
     const pm={};
-    rawData.forEach(d=>{
+    rawDataActivo.forEach(d=>{
       if(Number(d.AÑO)!==anio) return;
       if(f.MES.length>0&&!f.MES.includes(String(d.MES))) return;
       if(f.SEMANA.length>0&&!f.SEMANA.includes(String(d.SEMANA))) return;
@@ -496,7 +524,7 @@ function render() {
       }
     }
     const mesSel=new Set(f.MES), semSel=new Set(f.SEMANA);
-    rawData.forEach(d=>{
+    rawDataActivo.forEach(d=>{
       if(Number(d.AÑO)!==anio) return;
       if(isD1){ const ts=new Date(d.FECHA).getTime(); if(ts<sdTs||ts>edTs) return; }
       // MES y SEMANA aplican en ambos dashboards
@@ -652,7 +680,7 @@ function render() {
 // ── Tabla ─────────────────────────────────────────────────────────────
 function buildTabla(labels, datasets) {
   const wrap=$('tablaWrap');if(!wrap) return;
-  $('tblTitulo').textContent=currentDash===1?'Cantidad Diaria':'Promedio — '+groupMode;
+  $('tblTitulo').textContent=currentDash===1?'Cantidad Diaria':(currentDash===2?'Promedio Taller — ':'Promedio Dirección — ')+groupMode;
   wrap.style.display='block';
   const barDS=datasets.filter(d=>d.type==='bar');
   const metaDS=datasets.find(d=>d.label==='Meta');
@@ -689,20 +717,9 @@ const ESTRUCTURA = {
   }
 };
 
-function debugDatos() {
-  const años = [...new Set(rawData.map(d=>d.AÑO))].sort();
-  const ultimoAño = años[años.length-1];
-  const mesesDelAño = [...new Set(rawData.filter(d=>d.AÑO==ultimoAño).map(d=>d.MES))];
-  console.log('Último año:', ultimoAño);
-  console.log('Meses disponibles:', mesesDelAño);
-  console.log('Total registros:', rawData.length);
-  console.log('Registros mayo:', rawData.filter(d=>String(d.MES).toUpperCase().includes('MAY')).length);
-  console.log('Muestra registro:', rawData[rawData.length-1]);
-}
-
 function buildTabla2(f, anioBase) {
   const wrap = $('tbl2-wrap');
-  if(!wrap || currentDash !== 2) { if(wrap) wrap.style.display='none'; return; }
+  if(!wrap || currentDash === 1) { if(wrap) wrap.style.display='none'; return; }
   wrap.style.display = 'block';
 
   // Mismo periodo que la tabla de arriba: usar anioBase y meses del filtro activo
@@ -711,7 +728,7 @@ function buildTabla2(f, anioBase) {
 
   // Obtener meses con datos reales para este año (igual que tabla 1)
   const mesesConDatos = [...new Set(
-    rawData.filter(d => normStr0(d.AÑO) === añoUsar).map(d => normStr0(d.MES))
+    rawDataActivo.filter(d => normStr0(d.AÑO) === añoUsar).map(d => normStr0(d.MES))
   )].filter(Boolean).sort((a,b) => MESES.indexOf(a) - MESES.indexOf(b));
 
   const mesesMostrar = f.MES.length > 0
@@ -744,7 +761,7 @@ function buildTabla2(f, anioBase) {
   const normStr = normStr0;
 
   // Filtrar base igual que la tabla 1 (mismo año, mismos filtros activos excepto zona/div)
-  const baseData = rawData.filter(d => {
+  const baseData = rawDataActivo.filter(d => {
     if(normStr(d.AÑO) !== añoUsar) return false;
     if(f.TIPO.length   > 0 && !f.TIPO.includes(String(d.TIPO)))       return false;
     if(f.SEMANA.length > 0 && !f.SEMANA.includes(String(d.SEMANA)))   return false;
@@ -854,8 +871,13 @@ function changeDash(n) {
   currentDash=n;
   $('t1').className='tab-btn'+(n===1?' active':'');
   $('t2').className='tab-btn'+(n===2?' active':'');
-  $('row-promedio').style.display=n===2?'flex':'none';
-  $('date-range-ui').style.display=n===1?'flex':'none';
+  $('t3').className='tab-btn'+(n===3?' active':'');
+  const esPromedio = (n===2||n===3);
+  $('row-promedio').style.display  = esPromedio?'flex':'none';
+  $('date-range-ui').style.display = n===1?'flex':'none';
+  hiddenCats = new Set();          // reiniciar categorías ocultas al cambiar de pestaña
+  aplicarContexto();               // cambiar CATS y datos según la pestaña
+  buildFilters();                  // reconstruir filtros con los datos de la hoja activa
   updateUIFilters();
   render();
 }
